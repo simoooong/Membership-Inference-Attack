@@ -180,11 +180,3 @@ def preprocess_cifar10_dataset(data_dir='./data', num_classes=10, train_ratio=0.
     print(f"Final D_non_member dataset size (normalized): {len(D_non_member_normalized)} samples")
 
     return D_member_normalized, D_non_member_normalized
-
-
-# D_member, D_non_member = preprocess_cifar10_dataset(
-#     data_dir='./data', 
-#     train_ratio=0.5, 
-#     scale=1.0, 
-#     download=False # Set to True to download if not present
-# )

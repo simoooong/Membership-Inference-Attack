@@ -1,14 +1,14 @@
 import torch
 import torch.nn as nn
 import torch.optim as optim
-from torch.utils.data import DataLoader
+from torch.utils.data import DataLoader, Dataset
 import os
 import random
 import numpy as np
 
 from resnet_model import ResNet18
 
-def _set_seed(seed):
+def set_seed(seed):
     """
     Sets the random seed for reproducibility across multiple libraries.
     """
@@ -23,27 +23,32 @@ def _set_seed(seed):
     torch.backends.cudnn.benchmark = False 
     print(f"Random seed set to {seed}")
 
-def train_target_model(D_member_normalized, model_dir='./saved_models', num_classes=10,
-                       train_ratio=0.5, scale=1.0, num_epochs=50, learning_rate=0.001, batch_size=64):
+def train_target_model(D_member_normalized: Dataset,
+                       model_dir='./saved_models', 
+                       num_classes=10, 
+                       train_ratio=0.5, scale=1.0, 
+                       num_epochs=50, 
+                       learning_rate=0.001,
+                       train_criterion=nn.CrossEntropyLoss(),
+                       optimizer_class=optim.Adam,
+                       batch_size=64):
     """
     Trains the ResNet-18 target model (Model M) on the D_member dataset.
 
     Args:
         D_member_normalized (Dataset): The preprocessed and normalized dataset for training (members).
-        model_dir (str): Path to save the trained model.
+        model_dir (str): Base directory to save trained models.
         num_classes (int): The number of classes in the dataset (e.g., 10 for CIFAR-10).
-        train_ratio (float): Ratio of member samples within the scaled data pool.
-        scale (float): Fraction of the total CIFAR-10 dataset to use.
+        train_ratio (float): Ratio of member samples within the scaled data pool (for filename).
+        scale (float): Fraction of the total CIFAR-10 dataset to use (for filename).
         num_epochs (int): Number of training epochs.
         learning_rate (float): Learning rate for the optimizer.
+        train_criterion (nn.Module): The loss function to use for training.
+        optimizer_class (torch.optim.Optimizer): The class of the optimizer to use (e.g., optim.Adam).
         batch_size (int): Batch size for DataLoader.
     """
 
-    # Set seed for reproducibility
-    SEED = 42
-    _set_seed(SEED)
-
-    member_loader = DataLoader(D_member_normalized, batch_size=batch_size, shuffle=True,
+    member_loader = DataLoader(D_member_normalized, batch_size=batch_size, shuffle=False,
                                num_workers=os.cpu_count() if os.cpu_count() else 0)
 
     model_m = ResNet18(num_classes=num_classes)
@@ -52,8 +57,7 @@ def train_target_model(D_member_normalized, model_dir='./saved_models', num_clas
     model_m.to(device)
     print(f"Using device: {device}")
 
-    criterion = nn.CrossEntropyLoss()
-    optimizer = optim.Adam(model_m.parameters(), lr=learning_rate)
+    optimizer = optimizer_class(model_m.parameters(), lr=learning_rate)
 
     print(f"\n--- Starting Training of Target Model (Model M) on D_member ---")
     print(f"Total Epochs: {num_epochs}, Learning Rate: {learning_rate}, Batch Size: {batch_size}")
@@ -70,7 +74,7 @@ def train_target_model(D_member_normalized, model_dir='./saved_models', num_clas
             optimizer.zero_grad()
             outputs = model_m(inputs)
 
-            loss = criterion(outputs, labels)
+            loss = train_criterion(outputs, labels)
             loss.backward()
             optimizer.step()
 
@@ -87,52 +91,18 @@ def train_target_model(D_member_normalized, model_dir='./saved_models', num_clas
 
     print(f"\n--- Training Complete ---")
 
-    os.makedirs(model_dir, exist_ok=True)
+    scale_str = f"{scale:.2f}".replace('.', '_')
+    train_ratio_str = f"{train_ratio:.2f}".replace('.', '_')
+    epoch_accuracy_str = f"{epoch_accuracy:.2f}".replace('.', '_')
 
     model_filename = (
-        f"model_M_scale{scale:.2f}_trainratio{train_ratio:.2f}_trainacc{epoch_accuracy:.2f}.pth"
+        f"model_M_scale{scale_str}_trainratio{train_ratio_str}_epochs{num_epochs}"
+        f"_trainacc{epoch_accuracy_str}.pth" 
     )
-    
-    model_filename = model_filename.replace('.', '_') 
+
     model_save_path = os.path.join(model_dir, model_filename)
 
     torch.save(model_m.state_dict(), model_save_path)
     print(f"Trained Model M saved to: {model_save_path}")
 
     return model_m
-
-
-
-if __name__ == '__main__':
-    # This block is for testing the train_target_model function directly.
-    # In your full project, you would call train_target_model from a separate main script.
-
-    # Ensure data directory exists for preprocessing
-    data_dir = './data'
-    os.makedirs(data_dir, exist_ok=True)
-
-    # 1. Preprocess the CIFAR-10 dataset to get normalized D_member
-    # Make sure 'preprocess_data.py' is accessible and contains preprocess_cifar10_dataset
-    from data_preprocessing import preprocess_cifar10_dataset
-
-    print("\n--- Running a test training run ---")
-    D_member_normalized, _ = preprocess_cifar10_dataset(
-        data_dir=data_dir, 
-        train_ratio=0.5, 
-        scale=0.1, 
-        download=True # Set to True to download if not present
-    )
-
-    # 2. Train the target model
-    model_m = train_target_model(
-        D_member_normalized, 
-        model_dir='./test_models', 
-        num_classes=10,
-        train_ratio=0.5, 
-        scale=0.1, 
-        num_epochs=5, # Reduced epochs for a quicker test run
-        learning_rate=0.001, 
-        batch_size=64
-    )
-    print("\n--- Test training run complete. Check './saved_models' for the saved model. ---")
-
