@@ -4,9 +4,16 @@ import torch.nn.functional as F
 from torch.utils.data import DataLoader, Dataset
 import os
 import numpy as np
+from typing import Tuple
 from scipy.stats import entropy
 
-def extract_membership_metrics(model: nn.Module, dataset: Dataset, is_member_label:bool, test_criterion = nn.CrossEntropyLoss(reduction='none'), batch_size=64):
+def extract_membership_metrics(
+    model: nn.Module,
+    dataset: Dataset,
+    is_member_label: bool,
+    test_criterion: nn.Module,
+    batch_size: int = 64
+) -> Tuple[np.ndarray, np.ndarray]:
     """
     Extracts various membership inference metrics for each sample in a dataset
     using a trained model.
@@ -83,4 +90,3 @@ def extract_membership_metrics(model: nn.Module, dataset: Dataset, is_member_lab
     y = np.array(all_labels)
 
     return X, y
-

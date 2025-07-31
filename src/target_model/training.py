@@ -3,37 +3,23 @@ import torch.nn as nn
 import torch.optim as optim
 from torch.utils.data import DataLoader, Dataset
 import os
-import random
-import numpy as np
+from typing import Type
 
-from resnet_model import ResNet18
-
-def set_seed(seed):
+def train_target_model(
+    D_member_normalized: Dataset,
+    model_class: Type[nn.Module],
+    model_dir: str, 
+    num_classes: int, 
+    train_ratio: float,
+    scale: float, 
+    num_epochs: int, 
+    learning_rate: float,
+    train_criterion: nn.Module,
+    optimizer_class: optim.Optimizer,
+    batch_size: int
+) -> nn.Module:
     """
-    Sets the random seed for reproducibility across multiple libraries.
-    """
-    torch.manual_seed(seed)
-    
-    if torch.cuda.is_available():
-        torch.cuda.manual_seed_all(seed) 
-    np.random.seed(seed)
-    random.seed(seed)
-    
-    torch.backends.cudnn.deterministic = True
-    torch.backends.cudnn.benchmark = False 
-    print(f"Random seed set to {seed}")
-
-def train_target_model(D_member_normalized: Dataset,
-                       model_dir='./saved_models', 
-                       num_classes=10, 
-                       train_ratio=0.5, scale=1.0, 
-                       num_epochs=50, 
-                       learning_rate=0.001,
-                       train_criterion=nn.CrossEntropyLoss(),
-                       optimizer_class=optim.Adam,
-                       batch_size=64):
-    """
-    Trains the ResNet-18 target model (Model M) on the D_member dataset.
+    Trains a target model on the D_member dataset.
 
     Args:
         D_member_normalized (Dataset): The preprocessed and normalized dataset for training (members).
@@ -51,7 +37,7 @@ def train_target_model(D_member_normalized: Dataset,
     member_loader = DataLoader(D_member_normalized, batch_size=batch_size, shuffle=False,
                                num_workers=os.cpu_count() if os.cpu_count() else 0)
 
-    model_m = ResNet18(num_classes=num_classes)
+    model_m = model_class(num_classes=num_classes)
     
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     model_m.to(device)

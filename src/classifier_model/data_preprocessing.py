@@ -1,10 +1,16 @@
 import numpy as np
 from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import StandardScaler
+from typing import Tuple
 
-def prepare_classifier_dataset(X_member, y_member,
-                           X_non_member, y_non_member,
-                           test_size, random_state):
+def prepare_classifier_dataset(
+    X_member: np.ndarray,
+    y_member: np.ndarray,
+    X_non_member: np.ndarray,
+    y_non_member: np.ndarray,
+    test_size: float,
+    random_state: int
+) -> Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
     """
     Combines member and non-member metrics, splits them into stratified
     training and testing sets, and standardizes the features.

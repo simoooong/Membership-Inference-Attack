@@ -1,22 +1,22 @@
 import torch
 import torchvision
-import torchvision.transforms as transforms
+import torchvision.transforms as T
 from torch.utils.data import ConcatDataset, Subset, Dataset
 import os
 import random
+from typing import Tuple
 
-
-def _load_cifar10(data_dir='./data', download=True):
+def _load_cifar10(data_dir: str, download: bool) -> Dataset:
     """
     Loads CIFAR-10 datasets (train and test) without normalization,
     only converting images to tensors.
     """
 
     trainset_orig = torchvision.datasets.CIFAR10(root=data_dir, train=True,
-                                           download=download, transform=transforms.ToTensor())
+                                                download=download, transform=T.ToTensor())
 
     testset_orig = torchvision.datasets.CIFAR10(root=data_dir, train=False,
-                                                download=download, transform=transforms.ToTensor())
+                                                download=download, transform=T.ToTensor())
 
     full_cifar10_dataset = ConcatDataset([trainset_orig, testset_orig])
 
@@ -26,7 +26,7 @@ def _load_cifar10(data_dir='./data', download=True):
 
     return full_cifar10_dataset
 
-def _get_mean_std(dataset):
+def _get_mean_std(dataset: Dataset) -> Tuple[torch.Tensor, torch.Tensor]:
     """
     Calculates the channel-wise mean and standard deviation of a PyTorch dataset.
     Assumes dataset items are already converted to Tensors.
@@ -57,7 +57,7 @@ def _get_mean_std(dataset):
 
     print(f"Calculated Mean: {mean.tolist()}")
     print(f"Calculated Std: {std.tolist()}")
-
+    
     return mean, std
 
 class TransformedSubset(Dataset):
@@ -67,11 +67,11 @@ class TransformedSubset(Dataset):
     depends on properties of the subset itself.
     """
 
-    def __init__(self, subset, transform=None):
+    def __init__(self, subset: Dataset, transform: T.Compose):
         self.subset = subset
         self.transform = transform
 
-    def __getitem__(self, index):
+    def __getitem__(self, index: int):
         x, y = self.subset[index]
         if self.transform:
             x = self.transform(x)
@@ -80,7 +80,7 @@ class TransformedSubset(Dataset):
     def __len__(self):
         return len(self.subset)
 
-def _split_dataset(dataset, train_ratio=0.5, scale=1.0, num_classes=10):
+def _split_dataset(dataset: Dataset, num_classes: int, train_ratio: float, scale: float) -> Tuple[Dataset, Dataset]:
     """
     Splits the full dataset into D_member and D_non_member using stratified sampling
     to ensure equal class distribution in both subsets, considering a 'scale' factor
@@ -96,6 +96,7 @@ def _split_dataset(dataset, train_ratio=0.5, scale=1.0, num_classes=10):
 
     Returns:
         tuple: (D_member, D_non_member)
+               These are PyTorch Dataset objects.
     """
 
     total_samples_in_full_dataset = len(dataset)
@@ -140,7 +141,7 @@ def _split_dataset(dataset, train_ratio=0.5, scale=1.0, num_classes=10):
 
     return D_member, D_non_member
 
-def preprocess_cifar10_dataset(data_dir='./data', num_classes=10, train_ratio=0.5, scale=1.0, download=True):
+def preprocess_cifar10_dataset(data_dir: str, num_classes: int, train_ratio: float, scale: float, download: bool) -> Tuple[Dataset, Dataset]:
     """
     Orchestrates the entire CIFAR-10 data preprocessing pipeline:
     1. Loads raw CIFAR-10 data (train and test combined).
@@ -161,15 +162,15 @@ def preprocess_cifar10_dataset(data_dir='./data', num_classes=10, train_ratio=0.
                These are PyTorch Dataset objects.
     """
     print("\n--- Starting CIFAR-10 Preprocessing Pipeline ---")
-     
+    
     full_cifar10_dataset = _load_cifar10(data_dir, download)
     
-    D_member_raw, D_non_member_raw = _split_dataset(full_cifar10_dataset, train_ratio, scale, num_classes)
+    D_member_raw, D_non_member_raw = _split_dataset(full_cifar10_dataset, num_classes, train_ratio, scale)
 
     mean, std = _get_mean_std(D_member_raw)
 
-    normalize_transform = transforms.Compose([
-        transforms.Normalize(mean, std)
+    normalize_transform = T.Compose([
+        T.Normalize(mean, std)
     ])
 
     D_member_normalized = TransformedSubset(D_member_raw, normalize_transform)

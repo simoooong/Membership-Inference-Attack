@@ -1,16 +1,23 @@
 import torch
+import torch.nn as nn
 import os
 import re
+from typing import Type, Optional
 
-from resnet_model import ResNet18
-
-def load_model(model_dir, num_classes, train_ratio, scale):
+def load_model(
+    model_dir: str, 
+    model_class: Type[nn.Module],
+    num_classes: int, 
+    train_ratio: float, 
+    scale: float
+) -> Optional[nn.Module]:
     """
     Finds a saved model in the specified directory matching the given parameters
-    and loads its state_dict into a ResNet18 model.
+    and loads its state_dict into a provided model class.
 
     Args:
         model_dir (str): Directory where models are saved.
+        model_class (Type[nn.Module]): The class of the model to instantiate.
         num_classes (int): Number of classes the model was trained for.
         scale (float): Scale parameter used during training.
         train_ratio (float): Train ratio parameter used during training.
@@ -50,7 +57,7 @@ def load_model(model_dir, num_classes, train_ratio, scale):
     model_path = os.path.join(model_dir, best_model_file)
     print(f"Loading model from: {model_path}")
 
-    model = ResNet18(num_classes=num_classes)
+    model = model_class(num_classes=num_classes)
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
     model.load_state_dict(torch.load(model_path, map_location=device))
