@@ -7,6 +7,8 @@ from data_preprocessing import preprocess_cifar10_dataset
 from load_model import load_model
 from training_target_model import train_target_model, set_seed
 from test_target_model import extract_membership_metrics
+from preprocess_classifier_data import prepare_classifier_dataset
+from train_classifier_model import train_classifier_model, evaluate_classifier_model
 
 if __name__ == '__main__':
     SEED = 42
@@ -27,8 +29,9 @@ if __name__ == '__main__':
     optimizer_class = optim.Adam
     train_criterion = nn.CrossEntropyLoss()
     test_criterion = nn.CrossEntropyLoss(reduction='none')
+    test_size = 0.15
 
-    # 1. Preprocess the CIFAR-10 dataset to get normalized D_member and D_non_member
+    # 1. Preprocess the CIFAR-10 dataset to get standardized D_member and D_non_member
     D_member_normalized, D_non_member_normalized = preprocess_cifar10_dataset(
         data_dir=data_dir,
         train_ratio=train_ratio,
@@ -76,18 +79,27 @@ if __name__ == '__main__':
         batch_size=batch_size
     )
 
-    print(X_member)
-    print("_____________________________________________________________")
-    print(X_non_member)
+    # 5. Preprocess the membership metrics dataset to get standardized X_train_scaled, X_test_scaled, y_train, y_test
+    X_train, X_test, y_train, y_test = prepare_classifier_dataset(
+        X_member=X_member,
+        y_member=y_member,
+        X_non_member=X_non_member,
+        y_non_member=y_non_member,
+        test_size=test_size,
+        random_state=SEED
+    )
 
-    avg_metrics_member = np.mean(X_member, axis=0)
-    avg_metrics_non_member = np.mean(X_non_member, axis=0)
+    # 6. Train classifier model
+    classifier_model = train_classifier_model(
+        X_train=X_train,
+        y_train=y_train,
+        random_state=SEED
+    )
 
-
-    print("\n--- Key Metric Comparison (Averages) ---")
-    print(f"Average P_gt: Member={avg_metrics_member[0]:.4f}, Non-Member={avg_metrics_non_member[0]:.4f}")
-    print(f"Average L_CE: Member={avg_metrics_member[1]:.4f}, Non-Member={avg_metrics_non_member[1]:.4f}")
-    print(f"Average Entropy: Member={avg_metrics_member[2]:.4f}, Non-Member={avg_metrics_non_member[2]:.4f}")
-    print(f"Average Top-1 Sorted Probability: Member={avg_metrics_member[3]:.4f}, Non-Member={avg_metrics_non_member[3]:.4f}")
-    print(f"Average Top-1 Sorted Logit: Member={avg_metrics_member[3 + num_classes]:.4f}, Non-Member={avg_metrics_non_member[3 + num_classes]:.4f}")
+    # 7. Evaluate Classifier Model
+    evaluate_classifier_model(
+        classifier_model=classifier_model,
+        X_test=X_test,
+        y_test=y_test
+    )
     
