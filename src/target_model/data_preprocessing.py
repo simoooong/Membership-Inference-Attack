@@ -125,7 +125,11 @@ def _split_dataset(dataset: Dataset, num_classes: int, train_ratio: float, scale
         random.shuffle(current_class_indices)
 
         current_member_count = samples_per_class_member + (1 if class_id < member_remainder else 0)
-        current_non_member_count = samples_per_class_non_member + (1 if class_id < non_member_remainder else 0)
+        current_non_member_count = samples_per_class_non_member
+
+        if non_member_remainder > 0 and (len(current_class_indices) - current_member_count - samples_per_class_non_member > 0):
+            current_non_member_count += 1
+            non_member_remainder -= 1
 
         member_indices.extend(current_class_indices[:current_member_count])
         non_member_indices.extend(current_class_indices[current_member_count : current_member_count + current_non_member_count])
@@ -136,12 +140,9 @@ def _split_dataset(dataset: Dataset, num_classes: int, train_ratio: float, scale
     D_member = Subset(dataset, member_indices)
     D_non_member = Subset(dataset, non_member_indices)
 
-    print(f"\nCreated D_member with {len(D_member)} samples (stratified, scale={scale}).")
-    print(f"Created D_non_member with {len(D_non_member)} samples (stratified, scale={scale}).")
-
     return D_member, D_non_member
 
-def preprocess_cifar10_dataset(data_dir: str, num_classes: int, train_ratio: float, scale: float, download: bool) -> Tuple[Dataset, Dataset]:
+def preprocess_cifar10_dataset(data_dir: str, num_classes: int, train_ratio: float, val_ratio: float, scale: float, download: bool) -> Tuple[Dataset, Dataset, Dataset]:
     """
     Orchestrates the entire CIFAR-10 data preprocessing pipeline:
     1. Loads raw CIFAR-10 data (train and test combined).
@@ -166,18 +167,22 @@ def preprocess_cifar10_dataset(data_dir: str, num_classes: int, train_ratio: flo
     full_cifar10_dataset = _load_cifar10(data_dir, download)
     
     D_member_raw, D_non_member_raw = _split_dataset(full_cifar10_dataset, num_classes, train_ratio, scale)
+    D_member_train, D_member_val = _split_dataset(D_member_raw, num_classes, 1.0 - val_ratio, 1.0)
 
-    mean, std = _get_mean_std(D_member_raw)
+    mean, std = _get_mean_std(D_member_train)
 
     normalize_transform = T.Compose([
         T.Normalize(mean, std)
     ])
 
-    D_member_normalized = TransformedSubset(D_member_raw, normalize_transform)
+    D_member_train_normalized = TransformedSubset(D_member_train, normalize_transform)
+    D_member_val_normalized = TransformedSubset(D_member_val, normalize_transform)
     D_non_member_normalized = TransformedSubset(D_non_member_raw, normalize_transform)
 
+
     print("\n--- CIFAR-10 Preprocessing Pipeline Complete ---")
-    print(f"Final D_member dataset size (normalized): {len(D_member_normalized)} samples")
+    print(f"Final D_member_train dataset size (normalized): {len(D_member_train_normalized)} samples")
+    print(f"Final D_member_val dataset size (normalized): {len(D_member_val_normalized)} samples")
     print(f"Final D_non_member dataset size (normalized): {len(D_non_member_normalized)} samples")
 
-    return D_member_normalized, D_non_member_normalized
+    return D_member_train_normalized, D_member_val_normalized, D_non_member_normalized

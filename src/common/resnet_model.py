@@ -71,7 +71,7 @@ class ResNet(nn.Module):
         return out
 
 
-def ResNet18(num_classes=10):
+def ResNet18(num_classes: int):
     """
     Instantiates a ResNet-18 model.
     num_blocks = [2, 2, 2, 2] means 2 BasicBlocks in each of the four main layers.

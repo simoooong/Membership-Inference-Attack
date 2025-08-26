@@ -8,7 +8,8 @@ def load_model(
     model_dir: str, 
     model_class: Type[nn.Module],
     num_classes: int, 
-    train_ratio: float, 
+    train_ratio: float,
+    val_ratio: float,
     scale: float
 ) -> Optional[nn.Module]:
     """
@@ -23,12 +24,18 @@ def load_model(
         train_ratio (float): Train ratio parameter used during training.
     """
 
+    scale_str = f"{scale:.2f}".replace('.', '_')
+    train_ratio_str = f"{train_ratio:.2f}".replace('.', '_')
+    val_ratio_str = f"{val_ratio:.2f}".replace('.', '_')
+
     pattern = (
-        r"model_M_scale" + re.escape(f"{scale:.2f}").replace('.', '_') +
-        r"_trainratio" + re.escape(f"{train_ratio:.2f}").replace('.', '_') +
+        r"model_M_scale" + re.escape(scale_str) +
+        r"_trainratio" + re.escape(train_ratio_str) +
+        r"_valratio" + re.escape(val_ratio_str) +
         r"_epochs(\d+)" + 
-        r"_trainacc(\d+_\d+)\.pth"
+        r"_bestloss(\d+_\d+)\.pth"
     )
+
 
     matching_models = []
 
@@ -41,21 +48,21 @@ def load_model(
         return None
     
     best_model_file = None
-    best_accuracy = -1.0
+    lowest_loss = float('inf')
 
     for model_file in matching_models:
-        match = re.search(r"_trainacc(\d+_\d+)\.pth", model_file)
+        match = re.search(r"_bestloss(\d+_\d+)\.pth", model_file)
         if match:
-            acc_str = match.group(1).replace("_", ".")
-            current_acc = float(acc_str)
+            loss_str = match.group(1).replace("_", ".")
+            current_loss = float(loss_str)
 
-            if current_acc > best_accuracy:
-                best_accuracy = current_acc
+            if current_loss < lowest_loss:
+                lowest_loss = current_loss
                 best_model_file = model_file
 
 
     model_path = os.path.join(model_dir, best_model_file)
-    print(f"Loading model from: {model_path}")
+    print(f"Loading best model (lowest loss {lowest_loss:.4f}) from: {model_path}")
 
     model = model_class(num_classes=num_classes)
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
