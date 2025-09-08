@@ -28,10 +28,11 @@ class EarlyStopping:
         self.min_delta = min_delta
         self.counter = 0
         self.best_score = None
+        self.val_acc = None
         self.early_stop = False
         self.best_model_state = None
 
-    def __call__(self, current_score: float, model: nn.Module):
+    def __call__(self, current_score: float, val_acc: float, model: nn.Module):
         """
         Checks if the current score is an improvement.
         Args:
@@ -42,6 +43,7 @@ class EarlyStopping:
         """
         if self.best_score is None or current_score < self.best_score - self.min_delta:
             self.best_score = current_score
+            self.val_acc = val_acc
             self.best_model_state = copy.deepcopy(model.state_dict())
             self.counter = 0
         else:
@@ -52,6 +54,7 @@ class EarlyStopping:
         return self.early_stop
 
 def train_target_model(
+    dataset_name: str,
     train_dataset: Dataset,
     val_dataset: Dataset,
     model_class: Type[nn.Module],
@@ -115,6 +118,7 @@ def train_target_model(
     
     final_epochs = num_epochs
     final_val_loss = float('inf')
+    final_val_acc = 0.0
     
     for epoch in range(num_epochs):
         # --- TRAINING PHASE ---
@@ -169,16 +173,18 @@ def train_target_model(
               f"Validation Loss: {val_loss:.4f}, "
               f"Validation Accuracy: {val_acc:.2f}%)")
         
-        if early_stopper(val_loss, model_m):
+        if early_stopper(val_loss, val_acc, model_m):
             print(f"Early stopping triggered after {early_stopper.counter} epochs with no improvement.")
             print(f"Best validation loss was: {early_stopper.best_score:.4f}")
             
             final_epochs = epoch- early_stopper.patience
             final_val_loss = early_stopper.best_score
+            final_val_acc = early_stopper.val_acc
             break
         else:
             final_epochs = epoch + 1
             final_val_loss = val_loss
+            final_val_acc = val_acc
 
     print(f"\n--- Training Complete ---")
     
@@ -186,17 +192,19 @@ def train_target_model(
     model_m.load_state_dict(early_stopper.best_model_state)
     
     # Save the best model state based on validation loss
-    scale_str = f"{scale:.2f}".replace('.', '_')
-    train_ratio_str = f"{train_ratio:.2f}".replace('.', '_')
-    val_ratio_str = f"{val_ratio:.2f}".replace('.', '_')
+    scale_str = f"{scale}".replace('.', '_')
+    train_ratio_str = f"{train_ratio}".replace('.', '_')
+    val_ratio_str = f"{val_ratio}".replace('.', '_')
+    val_loss_str = f"{final_val_loss}".replace('.', '_')
+    val_acc_str = f"{final_val_acc}".replace('.', '_')
     
     model_filename = (
-        f"model_M_scale{scale_str}_trainratio{train_ratio_str}_valratio{val_ratio_str}_epochs{final_epochs}"
-        f"_bestloss{final_val_loss:.4f}".replace('.', '_') + ".pth"
+        f"dataset{dataset_name}_scale{scale_str}_trainratio{train_ratio_str}_valratio{val_ratio_str}_epochs{final_epochs}"
+        f"_val_loss{val_loss_str}_val_acc{val_acc_str}.pth"
     )
     
     model_save_path = os.path.join(model_dir, model_filename)
     torch.save(model_m.state_dict(), model_save_path)
     print(f"Trained Model M saved to: {model_save_path}")
 
-    return model_m
+    return model_m, final_val_acc, final_val_loss, final_epochs

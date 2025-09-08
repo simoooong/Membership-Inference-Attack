@@ -1,23 +1,22 @@
 import numpy as np
-from sklearn.linear_model import LogisticRegression
+from sklearn.base import BaseEstimator
 
-def train_classifier_model(X_train: np.ndarray, y_train: np.ndarray, random_state: int) -> LogisticRegression:
+def train_classifier_model(classifier_model: BaseEstimator, X_train: np.ndarray, y_train: np.ndarray) -> BaseEstimator:
     """
-    Trains a Logistic Regression classifier as the Membership Classifier (Model M').
+    Trains a given classifier model as the Membership Classifier (Model M').
 
     Args:
+        classifier_model (BaseEstimator): An instantiated scikit-learn compatible classifier model.
         X_train (np.ndarray): Training features (extracted metrics).
         y_train (np.ndarray): Training labels (0 for non-member, 1 for member).
-        random_state (int): Seed for reproducibility of the classifier's internal randomness.
 
     Returns:
-        sklearn.linear_model.LogisticRegression: The trained attack classifier.
+        BaseEstimator: The trained attack classifier.
     """
-    print("\n--- Training Membership Classifier (Model M') ---")
-
-    classifier_model = LogisticRegression(random_state=random_state, max_iter=1000, solver='liblinear')
+    print(f"\n--- Training Membership Classifier (Model M') using {classifier_model.__class__.__name__} ---")
+    
+    # Train the model
     classifier_model.fit(X_train, y_train)
-
-    print("Membership Classifier (Model M') training complete.")
-
+    
+    print(f"Membership Classifier ({classifier_model.__class__.__name__}) training complete.")
     return classifier_model

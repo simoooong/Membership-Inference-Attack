@@ -26,6 +26,38 @@ def _load_cifar10(data_dir: str, download: bool) -> Dataset:
 
     return full_cifar10_dataset
 
+def _load_stl10(data_dir: str, download: bool) -> Dataset:
+    """
+    Loads STL-10 datasets (train and test) without normalization,
+    only converting images to tensors.
+    Returns the combined dataset, datapoint_size, and num_classes.
+    """
+
+    trainset_orig = torchvision.datasets.STL10(root=data_dir, split='train',
+                                               download=download, transform=T.ToTensor())
+    
+    testset_orig = torchvision.datasets.STL10(root=data_dir, split='test',
+                                              download=download, transform=T.ToTensor())
+    
+    full_dataset = ConcatDataset([trainset_orig, testset_orig])
+    print(f"Loaded original STL-10 training set: {len(trainset_orig)} samples")
+    print(f"Loaded original STL-10 testing set: {len(testset_orig)} samples")
+    print(f"Combined STL-10 dataset size: {len(full_dataset)} samples")
+    return full_dataset
+
+def get_dataset_info(dataset_name: str):
+    """
+    Returns the appropriate data preprocessing function, datapoint_size, and num_classes
+    based on the dataset name.
+    """
+
+    if dataset_name.lower() == 'cifar-10':
+        return _load_cifar10, 32, 10
+    elif dataset_name.lower() == 'stl-10':
+        return _load_stl10, 96, 10
+    else:
+        raise ValueError(f"Unknown dataset name: {dataset_name}. Supported: 'CIFAR-10', 'STL-10'")
+
 def _get_mean_std(dataset: Dataset) -> Tuple[torch.Tensor, torch.Tensor]:
     """
     Calculates the channel-wise mean and standard deviation of a PyTorch dataset.
@@ -142,29 +174,41 @@ def _split_dataset(dataset: Dataset, num_classes: int, train_ratio: float, scale
 
     return D_member, D_non_member
 
-def preprocess_cifar10_dataset(data_dir: str, num_classes: int, train_ratio: float, val_ratio: float, scale: float, download: bool) -> Tuple[Dataset, Dataset, Dataset]:
+def preprocess_dataset(
+    dataset_name: str,
+    load_fn,
+    data_dir: str,
+    num_classes: int,
+    train_ratio: float, 
+    val_ratio: float, 
+    scale: float, 
+    download: bool
+) -> Tuple[Dataset, Dataset, Dataset]:
     """
-    Orchestrates the entire CIFAR-10 data preprocessing pipeline:
-    1. Loads raw CIFAR-10 data (train and test combined).
-    2. Splits the combined dataset into D_member_raw and D_non_member_raw using stratified sampling.
-    3. Calculates mean and standard deviation *only* from D_member_raw.
-    4. Creates a normalization transform using the calculated stats.
-    5. Applies this normalization transform to both D_member_raw and D_non_member_raw.
+    Orchestrates the entire data preprocessing pipeline for a given dataset:
+    1. Loads raw data (train and test combined) for the specified dataset.
+    2. Scales the total dataset size if `scale` < 1.0.
+    3. Splits the scaled dataset into D_member_raw and D_non_member_raw using stratified sampling.
+    4. Splits D_member_raw into D_member_train and D_member_val using stratified sampling.
+    5. Calculates mean and standard deviation *only* from D_member_train.
+    6. Creates a normalization transform using the calculated stats.
+    7. Applies this normalization transform to D_member_train, D_member_val, and D_non_member_raw.
 
     Args:
-        data_dir (str): Directory to store/load CIFAR-10 data.
-        num_classes (int): The number of classes in the dataset (e.g., 10 for CIFAR-10).
-        train_ratio (float): Ratio of member samples within the scaled data pool (for D_member).
-        scale (float): Fraction of the total CIFAR-10 dataset to use.
-        download (bool): Whether to download CIFAR-10 if not found.
+        dataset_name (str): Name of the dataset (e.g., 'CIFAR-10', 'STL-10', 'Food-101').
+        data_dir (str): Directory to store/load dataset data.
+        train_ratio (float): Ratio of member samples within the scaled data pool (for D_member_raw).
+        val_ratio (float): Ratio of validation samples within D_member_raw (for D_member_val).
+        scale (float): Fraction of the total dataset to use.
+        download (bool): Whether to download the dataset if not found.
 
     Returns:
-        tuple: (D_member_normalized, D_non_member_normalized)
+        tuple: (D_member_train_normalized, D_member_val_normalized, D_non_member_normalized)
                These are PyTorch Dataset objects.
     """
-    print("\n--- Starting CIFAR-10 Preprocessing Pipeline ---")
+    print(f"\n--- Starting Preprocessing Pipeline for {dataset_name} ---")
     
-    full_cifar10_dataset = _load_cifar10(data_dir, download)
+    full_cifar10_dataset = load_fn(data_dir, download)
     
     D_member_raw, D_non_member_raw = _split_dataset(full_cifar10_dataset, num_classes, train_ratio, scale)
     D_member_train, D_member_val = _split_dataset(D_member_raw, num_classes, 1.0 - val_ratio, 1.0)
