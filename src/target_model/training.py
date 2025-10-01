@@ -69,7 +69,8 @@ def train_target_model(
     optimizer_class: optim.Optimizer,
     batch_size: int,
     patience: int,
-    min_delta: int
+    min_delta: int,
+    early_stopping: bool
 ) -> nn.Module:
     """
     Trains a target model on the D_member training dataset, using the
@@ -173,7 +174,7 @@ def train_target_model(
               f"Validation Loss: {val_loss:.4f}, "
               f"Validation Accuracy: {val_acc:.2f}%)")
         
-        if early_stopper(val_loss, val_acc, model_m):
+        if early_stopping and early_stopper(val_loss, val_acc, model_m):
             print(f"Early stopping triggered after {early_stopper.counter} epochs with no improvement.")
             print(f"Best validation loss was: {early_stopper.best_score:.4f}")
             
@@ -189,7 +190,8 @@ def train_target_model(
     print(f"\n--- Training Complete ---")
     
     # Load the best model state before saving
-    model_m.load_state_dict(early_stopper.best_model_state)
+    if early_stopping:
+        model_m.load_state_dict(early_stopper.best_model_state)
     
     # Save the best model state based on validation loss
     scale_str = f"{scale}".replace('.', '_')
