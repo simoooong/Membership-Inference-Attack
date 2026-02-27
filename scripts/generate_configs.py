@@ -1,9 +1,6 @@
 import json
-from typing import List, Dict, Any, Type
+from typing import List, Dict, Any
 from dataclasses import dataclass, field
-import torch.nn as nn
-import torch.optim as optim
-
 
 @dataclass
 class FixedParams:
@@ -16,7 +13,7 @@ class FixedParams:
     SEED: int = 42
     data_dir: str = './data'
     model_dir: str = './saved_models'
-    results_file: str = './results.jsonl'
+    results_file: str = './artifacts/all_params.jsonl'
     
     # Ratios (train_ratio = 1 / (2 - val_ratio))
     val_ratio: float = 0.1
@@ -82,7 +79,7 @@ def generate_experiment_config() -> List[Dict[str, Any]]:
             for mia_clf in dynamic.mia_classifier_choices:
                 config = {
                     "experiment_plan": "Impact of Learning Rate",
-                    "results_file": "impact_of_learning_rate.json",
+                    "results_file": "./artifacts/results.jsonl",
                     "dataset_name": dataset,
                     "learning_rate": lr,
                     "scale": fixed_scale,
@@ -107,7 +104,7 @@ def generate_experiment_config() -> List[Dict[str, Any]]:
             for mia_clf in dynamic.mia_classifier_choices:
                 config = {
                     "experiment_plan": "Impact of Epochs",
-                    "results_file": "impact_of_epochs.json",
+                    "results_file": "./results.jsonl",
                     "dataset_name": dataset,
                     "learning_rate" : fixed_lr,
                     "scale": fixed_scale,
@@ -134,7 +131,7 @@ def generate_experiment_config() -> List[Dict[str, Any]]:
             for mia_clf in dynamic.mia_classifier_choices:
                 config = {
                     "experiment_plan" : "Impact of Scale",
-                    "results_file": "impact_of_scale.json",
+                    "results_file": "./results.jsonl",
                     "dataset_name": dataset,
                     "learning_rate" : fixed_lr,
                     "scale": scale,

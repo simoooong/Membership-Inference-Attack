@@ -29,7 +29,7 @@ from sklearn.base import BaseEstimator
 
 # --- Utility Functions ---
 
-def load_experiment_configs(filepath: str = 'experiment_configs.json') -> List[Dict[str, Any]]:
+def load_experiment_configs(filepath: str) -> List[Dict[str, Any]]:
     """
     Reads the list of experiment configurations from a JSON file.
     """
@@ -93,8 +93,8 @@ def single_run(config_dict: Dict[str, Any]):
 
     # Console output
     print(f"\n--- Starting Experiment Run (Plan: {config_dict.get('experiment_plan', 'N/A')}) ---")
-    print(f"  Dataset: {config_dict['dataset_name']}, Scale: {config_dict['scale']:.1f}, LR: {config_dict['learning_rate']}, Epochs: {config_dict['num_epochs']}")
-    print(f"  MIA Classifier: {config_dict['mia_classifier_choice']}")
+    print(f" Dataset: {config_dict['dataset_name']}, Scale: {config_dict['scale']:.1f}, LR: {config_dict['learning_rate']}, Epochs: {config_dict['num_epochs']}")
+    print(f" MIA Classifier: {config_dict['mia_classifier_choice']}")
     print(f"--------------------------------------------------------------------")
 
     try:
@@ -222,7 +222,7 @@ def main():
     Main function to orchestrate the loading and execution of all experiments
     defined in experiment_configs.json.
     """
-    CONFIG_FILE = 'experiment_configs.json'
+    CONFIG_FILE = './artifacts/experiment_configs.json'
     
     # 1. Load all configurations
     all_configs = load_experiment_configs(CONFIG_FILE)
