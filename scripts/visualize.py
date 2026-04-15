@@ -110,67 +110,61 @@ def compare_classifiers(df, root_path):
     plt.savefig(file_path)
     plt.close()
 
-def create_heatmap_mean_std(df: pd.DataFrame, fixed_factor: str, x_axis: str, y_axis: str, root_path, metric=METRIC_COL):
-    """Generates summary heatmaps."""
+def create_heatmap_mean(df: pd.DataFrame, fixed_factor: str, x_axis: str, y_axis: str, root_path, metric=METRIC_COL):
+    """Generates a mean heatmap."""
     file_dir = os.path.join(root_path, "heatmaps")
     os.makedirs(file_dir, exist_ok=True)
-    filepath = os.path.join(file_dir, f"heatmap_{fixed_factor}_mean_std_summary.png")
-    
+    filepath = os.path.join(file_dir, f"heatmap_{fixed_factor}_mean.png")
+
+    LABEL_MAP = {
+        "target_model_learning_rate": "Learning Rate",
+        "scale": "Scale",
+        "target_model_epochs_requested": "Number of Epochs",
+    }
+
+    def fmt(col):
+        return LABEL_MAP.get(col, col)
+
     group_cols = [y_axis, x_axis]
-    
+
     for col in group_cols + [metric]:
         if col not in df.columns:
             print(f"Error: Column '{col}' not found for heatmap generation.")
-            return None, None
+            return None
 
-    summary_df = df.groupby(group_cols)[metric].agg(['mean', 'std']).reset_index()
-
-    mean_pivot = summary_df.pivot(index=y_axis, columns=x_axis, values='mean')
-    std_pivot = summary_df.pivot(index=y_axis, columns=x_axis, values='std')
-
+    summary_df = df.groupby(group_cols)[metric].mean().reset_index()
+    mean_pivot = summary_df.pivot(index=y_axis, columns=x_axis, values=metric)
     mean_pivot = mean_pivot.sort_index(ascending=True).sort_index(axis=1)
-    std_pivot = std_pivot.sort_index(ascending=True).sort_index(axis=1)
 
-    fig, axes = plt.subplots(1, 2, figsize=(18, 7))
+    fig, ax = plt.subplots(1, 1, figsize=(10, 7))
     plt.style.use('default')
 
-    def plot_mesh(ax, pivot_data, cmap, title, label, vmin=None, vmax=None):
-        X, Y = np.meshgrid(np.arange(len(pivot_data.columns) + 1), np.arange(len(pivot_data.index) + 1))
-        # pcolormesh is better than imshow for discrete grid data and avoids white line artifacts
-        mesh = ax.pcolormesh(X, Y, pivot_data.values, cmap=cmap, vmin=vmin, vmax=vmax, edgecolors='none', shading='flat')
-        
-        fig.colorbar(mesh, ax=ax, label=label)
-        ax.set_title(title, fontsize=14)
-        ax.set_xlabel(x_axis, fontsize=12)
-        ax.set_ylabel(y_axis, fontsize=12)
-        
-        # Center ticks
-        ax.set_xticks(np.arange(len(pivot_data.columns)) + 0.5)
-        ax.set_xticklabels([f'{e}' for e in pivot_data.columns], rotation=45, ha="right")
-        ax.set_yticks(np.arange(len(pivot_data.index)) + 0.5)
-        ax.set_yticklabels([f'{s:.1f}' if isinstance(s, (float, np.float64)) else f'{s}' for s in pivot_data.index])
-        
+    X, Y = np.meshgrid(np.arange(len(mean_pivot.columns) + 1), np.arange(len(mean_pivot.index) + 1))
+    mesh = ax.pcolormesh(X, Y, mean_pivot.values, cmap='viridis',
+                         vmin=df[metric].min(), vmax=df[metric].max(),
+                         edgecolors='none', shading='flat')
 
-        for i in range(len(pivot_data.index)):
-            for j in range(len(pivot_data.columns)):
-                val = pivot_data.iloc[i, j]
-                if not np.isnan(val):
-                    txt_color = "white" if (cmap == 'viridis' and val < 0.6) or (cmap == 'Reds' and val > (pivot_data.max().max() * 0.7)) else "black"
-                    ax.text(j + 0.5, i + 0.5, f"{val:.3f}" if 'mean' in title.lower() else f"{val:.4f}", 
-                            ha="center", va="center", color=txt_color, fontsize=9)
+    fig.colorbar(mesh, ax=ax, label=f'Mean {metric}')
+    ax.set_title(f'Mean {metric}\n{fmt(y_axis)} vs. {fmt(x_axis)} (fixed: {fmt(fixed_factor)})', fontsize=13)
+    ax.set_xlabel(fmt(x_axis), fontsize=12)
+    ax.set_ylabel(fmt(y_axis), fontsize=12)
 
-    # --- Plot 1: Mean ---
-    plot_mesh(axes[0], mean_pivot, 'viridis', f'Mean {metric} for {y_axis} vs. {x_axis}\n(Avg over {fixed_factor})', 
-              f'Average {metric}', vmin=df[metric].min(), vmax=df[metric].max())
+    ax.set_xticks(np.arange(len(mean_pivot.columns)) + 0.5)
+    ax.set_xticklabels([f'{e}' for e in mean_pivot.columns], rotation=45, ha="right")
+    ax.set_yticks(np.arange(len(mean_pivot.index)) + 0.5)
+    ax.set_yticklabels([f'{s:.1f}' if isinstance(s, (float, np.float64)) else f'{s}' for s in mean_pivot.index])
 
-    # --- Plot 2: Std ---
-    plot_mesh(axes[1], std_pivot, 'Reds', f'Std Dev of {metric} for {y_axis} vs. {x_axis}\n(Avg over {fixed_factor})', 
-              'Standard Deviation (STD)')
+    for i in range(len(mean_pivot.index)):
+        for j in range(len(mean_pivot.columns)):
+            val = mean_pivot.iloc[i, j]
+            if not np.isnan(val):
+                txt_color = "white" if val < 0.6 else "black"
+                ax.text(j + 0.5, i + 0.5, f"{val:.3f}",
+                        ha="center", va="center", color=txt_color, fontsize=9)
 
     plt.tight_layout()
-    plt.savefig(filepath, dpi=150)
-    plt.close(fig) 
-    return mean_pivot, std_pivot
+    plt.savefig(filepath, dpi=150, bbox_inches='tight')
+    plt.close(fig)
 
 def generate_plots():
     data_df = load_data(FILE_PATH, DATASET)
@@ -190,7 +184,7 @@ def generate_plots():
     for hp in HYPERPARAMS:
         box_plot_hyperparameter(clf_df, hp, CLASSIFIER_CHOICE, root_path)
 
-    create_heatmap_mean_std(
+    create_heatmap_mean(
         df=clf_df, 
         fixed_factor='target_model_epochs_requested', 
         y_axis='target_model_learning_rate',
@@ -198,7 +192,7 @@ def generate_plots():
         root_path=root_path
     )
 
-    create_heatmap_mean_std(
+    create_heatmap_mean(
         df=clf_df, 
         fixed_factor='scale', 
         y_axis='target_model_epochs_requested',
@@ -206,7 +200,7 @@ def generate_plots():
         root_path=root_path
     )
 
-    create_heatmap_mean_std(
+    create_heatmap_mean(
         df=clf_df, 
         fixed_factor='target_model_learning_rate', 
         y_axis='target_model_epochs_requested',
